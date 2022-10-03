@@ -260,7 +260,7 @@ public class MainActivity extends CyaneaAppCompatActivity {
             viewBinding.pdfView.setBackgroundColor(0xFF212121);
         }
         viewBinding.pdfView.useBestQuality(prefManager.getBoolean("quality_pref", false));
-        viewBinding.pdfView.setMinZoom(0.5f);
+        viewBinding.pdfView.setMinZoom(1f);
         viewBinding.pdfView.setMidZoom(2.0f);
         viewBinding.pdfView.setMaxZoom(5.0f);
         viewConfigurator
