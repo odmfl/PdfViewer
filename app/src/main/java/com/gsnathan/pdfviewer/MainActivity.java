@@ -274,7 +274,7 @@ public class MainActivity extends CyaneaAppCompatActivity {
                 .spacing(10) // in dp
                 .onError(this::handleFileOpeningError)
                 .onPageError((page, err) -> Log.e(TAG, "Cannot load page " + page, err))
-                .pageFitPolicy(FitPolicy.WIDTH)
+                .pageFitPolicy(FitPolicy.BOTH)
                 .password(pdfPassword)
                 .swipeHorizontal(prefManager.getBoolean("scroll_pref", false))
                 .autoSpacing(prefManager.getBoolean("scroll_pref", false))
