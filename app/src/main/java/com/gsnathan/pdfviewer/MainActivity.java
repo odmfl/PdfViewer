@@ -36,6 +36,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.StrictMode;
 import android.preference.PreferenceManager;
 import android.print.PrintManager;
@@ -49,7 +51,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.Window;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -62,6 +63,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
+import androidx.room.Room;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle;
@@ -80,6 +82,8 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
@@ -87,8 +91,12 @@ public class MainActivity extends CyaneaAppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
+    private final Executor executor = Executors.newSingleThreadExecutor();
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    
     private PrintManager mgr;
     private SharedPreferences prefManager;
+    private AppDatabase appDb;
 
     private Uri uri;
     private int pageNumber = 0;
@@ -138,6 +146,7 @@ public class MainActivity extends CyaneaAppCompatActivity {
         prefManager = PreferenceManager.getDefaultSharedPreferences(this);
 
         mgr = (PrintManager) getSystemService(PRINT_SERVICE);
+        appDb = Room.databaseBuilder(getApplicationContext(), AppDatabase.class, "app-db").build();
         onFirstInstall();
         onFirstUpdate();
 
@@ -259,17 +268,34 @@ public class MainActivity extends CyaneaAppCompatActivity {
     }
 
     void configurePdfViewAndLoad(PDFView.Configurator viewConfigurator) {
+        if (pageNumber == 0) { // attempt to find a saved location
+            executor.execute(() -> { // off UI thread
+                Integer maybePageNumber = appDb.savedLocationDao().findSavedPage(uri.toString());
+                handler.post(() -> // back on UI thread
+                    configurePdfViewAndLoadWithPageNumber(
+                        viewConfigurator,
+                        maybePageNumber != null ? maybePageNumber : 0
+                    )
+                );
+            });
+        } else {
+            configurePdfViewAndLoadWithPageNumber(viewConfigurator, pageNumber);
+        }
+    }
+
+    void configurePdfViewAndLoadWithPageNumber(PDFView.Configurator viewConfigurator, int pageNum) {
         if (!prefManager.getBoolean("pdftheme_pref", false)) {
             viewBinding.pdfView.setBackgroundColor(Color.LTGRAY);
         } else {
             viewBinding.pdfView.setBackgroundColor(0xFF212121);
         }
+        
         viewBinding.pdfView.useBestQuality(prefManager.getBoolean("quality_pref", false));
         viewBinding.pdfView.setMinZoom(1f);
         viewBinding.pdfView.setMidZoom(2.0f);
         viewBinding.pdfView.setMaxZoom(5.0f);
         viewConfigurator
-                .defaultPage(pageNumber)
+                .defaultPage(pageNum)
                 .onPageChange(this::setCurrentPage)
                 .enableAnnotationRendering(true)
                 .enableAntialiasing(prefManager.getBoolean("alias_pref", true))
@@ -496,6 +522,11 @@ public class MainActivity extends CyaneaAppCompatActivity {
     }
 
     private void setCurrentPage(int page, int pageCount) {
+        if (uri != null) {
+            executor.execute(() -> // off UI thread
+                appDb.savedLocationDao().insert(new SavedLocation(uri.toString(), pageNumber))
+            );
+        }
         pageNumber = page;
         setTitle(String.format("%s %s / %s", pdfFileName + " ", page + 1, pageCount));
     }
