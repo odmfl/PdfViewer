@@ -2,7 +2,7 @@
 
 <img src="./images/high_res.png" width="120" />
 
-<h1 align="center"> Pdf Viewer Plus </h1>
+ Pdf Viewer Plus 
 
 </p>
 
